@@ -29,7 +29,8 @@ static void
 replace_with_formatted_load_buffer_amd(nir_builder *b, nir_def *old_def, nir_deref_instr *deref,
                                        nir_def *handle, nir_def *heap_offset, nir_def *vindex,
                                        unsigned access, nir_variable_mode mode,
-                                       unsigned backend_flags, nir_alu_type dest_type)
+                                       unsigned backend_flags, nir_alu_type dest_type,
+                                       unsigned texture_index)
 {
    nir_def *zero = nir_imm_int(b, 0);
 
@@ -37,6 +38,7 @@ replace_with_formatted_load_buffer_amd(nir_builder *b, nir_def *old_def, nir_der
                                  .texture_deref = deref,
                                  .texture_handle = handle,
                                  .texture_heap_offset = heap_offset,
+                                 .texture_index = texture_index,
                                  .dim = GLSL_SAMPLER_DIM_BUF,
                                  .dest_type = nir_type_uint32,
                                  .can_speculate = access & ACCESS_CAN_SPECULATE,
@@ -197,7 +199,7 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, const ac_nir_lower_image_tex_optio
                                              (tex->skip_helpers ? ACCESS_SKIP_HELPERS : 0) |
                                              (tex->is_sparse ? ACCESS_SPARSE : 0),
                                              nir_var_uniform /* nir_var_texture? */, 0,
-                                             tex->dest_type);
+                                             tex->dest_type, tex->texture_index);
       return true;
    }
 
@@ -242,7 +244,7 @@ lower_image(nir_builder *b, nir_intrinsic_instr *intr, const ac_nir_lower_image_
 
       replace_with_formatted_load_buffer_amd(b, &intr->def, deref, handle, heap_offset, vindex, access,
                                              nir_var_image, AC_NIR_TEX_BACKEND_FLAG_IS_IMAGE,
-                                             nir_intrinsic_dest_type(intr));
+                                             nir_intrinsic_dest_type(intr), 0);
       return true;
    }
 

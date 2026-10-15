@@ -394,8 +394,9 @@ assign_outinfo_params(struct radv_vs_output_info *outinfo, uint64_t mask, unsign
                       unsigned extra_offset)
 {
    u_foreach_bit64 (idx, mask) {
-      if (idx >= VARYING_SLOT_VAR0 || idx == VARYING_SLOT_LAYER || idx == VARYING_SLOT_PRIMITIVE_ID ||
-          idx == VARYING_SLOT_VIEWPORT)
+      if (idx >= VARYING_SLOT_VAR0 || (idx >= VARYING_SLOT_COL0 && idx <= VARYING_SLOT_TEX7) ||
+          idx == VARYING_SLOT_BFC0 || idx == VARYING_SLOT_BFC1 || idx == VARYING_SLOT_LAYER ||
+          idx == VARYING_SLOT_PRIMITIVE_ID || idx == VARYING_SLOT_VIEWPORT)
          assign_outinfo_param(outinfo, idx, total_param_exports, extra_offset);
    }
 }
@@ -1276,8 +1277,10 @@ gfx10_get_ngg_info(const struct radv_compiler_info *compiler_info, struct radv_s
    const unsigned gs_vertices_out = gs_info ? gs_info->gs.vertices_out : 0;
    ac_ngg_subgroup_info info;
 
+   /* Keep linked PS5 tessellation/GS programs within one wave per SIMD even
+    * when fixed FP64 varying inputs leave no room for two-wave occupancy. */
    ac_ngg_compute_subgroup_info(gfx_level, es_info->stage, !!gs_info, input_prim, gs_vertices_out, gs_num_invocations,
-                                128, 256, stage_info->wave_size, es_info->esgs_itemsize,
+                                128, 128, stage_info->wave_size, es_info->esgs_itemsize,
                                 stage_info->ngg_lds_vertex_size, stage_info->ngg_lds_scratch_size, false, 0, &info);
 
    out->hw_max_esverts = info.hw_max_esverts;

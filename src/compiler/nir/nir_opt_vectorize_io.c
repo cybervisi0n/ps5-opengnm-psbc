@@ -58,6 +58,10 @@ compare_is_not_vectorizable(nir_intrinsic_instr *a, nir_intrinsic_instr *b)
    if (sem0.location != sem1.location)
       return sem0.location > sem1.location ? 1 : -1;
 
+   /* Compact Gallium double vectors share a location, not their data. */
+   if (sem0.high_dvec2 != sem1.high_dvec2)
+      return sem0.high_dvec2 > sem1.high_dvec2 ? 1 : -1;
+
    /* The mediump flag isn't mergable. */
    if (sem0.medium_precision != sem1.medium_precision)
       return sem0.medium_precision > sem1.medium_precision ? 1 : -1;

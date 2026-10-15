@@ -156,6 +156,7 @@ struct aco_compiler_options {
    enum radeon_family family;
    enum amd_gfx_level gfx_level;
    uint32_t address32_hi;
+   bool buffer_scratch;
 };
 
 enum aco_statistic {

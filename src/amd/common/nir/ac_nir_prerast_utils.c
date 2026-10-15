@@ -924,6 +924,7 @@ ac_nir_ngg_build_streamout_buffer_info(nir_builder *b,
                                        enum amd_gfx_level gfx_level,
                                        bool has_xfb_prim_query,
                                        bool use_gfx12_xfb_intrinsic,
+                                       bool use_ps5_global_streamout,
                                        nir_def *scratch_base,
                                        nir_def *tid_in_tg,
                                        nir_def *gen_prim[4],
@@ -973,10 +974,10 @@ ac_nir_ngg_build_streamout_buffer_info(nir_builder *b,
 
       nir_def *buffer_offsets = NULL, *xfb_state_address = NULL, *xfb_voffset = NULL;
 
-      /* Get current global offset of buffer and increase by amount of
-       * workgroup buffer size. This is an ordered operation sorted by
-       * ordered_id; Each buffer info is in a channel of a vec4.
-       */
+      /* Reserve each workgroup's global buffer range. Native paths order the
+       * reservation by ordered_id. PS5's no-GDS path uses global atomics,
+       * which guarantees unique ranges but not cross-workgroup primitive
+       * order. Each buffer's information occupies one vec4 channel. */
       if (gfx_level >= GFX12) {
          nir_pop_if(b, if_invocation_0);
 
@@ -1109,6 +1110,19 @@ ac_nir_ngg_build_streamout_buffer_info(nir_builder *b,
          buffer_offsets = nir_if_phi(b, buffer_offsets, nir_undef(b, 4, 32));
 
          if_invocation_0 = nir_push_if(b, nir_ieq_imm(b, tid_in_tg, 0));
+      } else if (use_ps5_global_streamout) {
+         nir_def *state_desc = nir_load_streamout_buffer_amd(b, .base = 4);
+         nir_def *state_hi = nir_channel(b, state_desc, 1);
+
+         xfb_state_address = nir_pack_64_2x32_split(
+            b, nir_channel(b, state_desc, 0), state_hi);
+         nir_def *offset[4] = {undef, undef, undef, undef};
+         u_foreach_bit(buffer, info->buffers_written) {
+            offset[buffer] = nir_global_atomic_amd(
+               b, 32, xfb_state_address, workgroup_buffer_sizes[buffer],
+               nir_imm_int(b, buffer * 4), .atomic_op = nir_atomic_op_iadd);
+         }
+         buffer_offsets = nir_vec(b, offset, 4);
       } else {
          nir_def *ordered_id = nir_load_ordered_id_amd(b);
          buffer_offsets =
@@ -1183,6 +1197,18 @@ ac_nir_ngg_build_streamout_buffer_info(nir_builder *b,
          nir_pop_if(b, if_any_overflow_4_lanes);
 
          if_invocation_0 = nir_push_if(b, nir_ieq_imm(b, tid_in_tg, 0));
+      } else if (use_ps5_global_streamout) {
+         nir_if *if_any_overflow = nir_push_if(b, any_overflow);
+         {
+            u_foreach_bit(buffer, info->buffers_written) {
+               nir_global_atomic_amd(
+                  b, 32, xfb_state_address,
+                  nir_ineg(b, overflow_amount[buffer]),
+                  nir_imm_int(b, buffer * 4),
+                  .atomic_op = nir_atomic_op_iadd);
+            }
+         }
+         nir_pop_if(b, if_any_overflow);
       } else {
          nir_if *if_any_overflow = nir_push_if(b, any_overflow);
          nir_xfb_counter_sub_gfx11_amd(b, nir_vec(b, overflow_amount, 4),
@@ -1196,8 +1222,20 @@ ac_nir_ngg_build_streamout_buffer_info(nir_builder *b,
          nir_store_shared(b, emit_prim[stream], scratch_base, .base = 16 + stream * 4);
       }
 
-      /* Update shader query. */
-      if (has_xfb_prim_query) {
+      /* PS5 has no public GDS allocation route. Keep query totals in the
+       * same private global-memory state as the buffer offsets. */
+      if (use_ps5_global_streamout) {
+         u_foreach_bit(stream, info->streams_written) {
+            nir_global_atomic_amd(
+               b, 32, xfb_state_address, gen_prim[stream],
+               nir_imm_int(b, 16 + stream * 4),
+               .atomic_op = nir_atomic_op_iadd);
+            nir_global_atomic_amd(
+               b, 32, xfb_state_address, emit_prim[stream],
+               nir_imm_int(b, 32 + stream * 4),
+               .atomic_op = nir_atomic_op_iadd);
+         }
+      } else if (has_xfb_prim_query) {
          nir_if *if_shader_query = nir_push_if(b, nir_load_prim_xfb_query_enabled_amd(b));
          {
             for (unsigned stream = 0; stream < 4; stream++) {
@@ -1206,6 +1244,60 @@ ac_nir_ngg_build_streamout_buffer_info(nir_builder *b,
             }
          }
          nir_pop_if(b, if_shader_query);
+      }
+
+      if (use_ps5_global_streamout) {
+         if (b->shader->info.stage == MESA_SHADER_GEOMETRY ||
+             b->shader->info.stage == MESA_SHADER_TESS_EVAL) {
+            /* Record workgroup ranges for ordered host compaction. The API
+             * primitive/invocation pair does not wrap at ordered_id's 12 bits.
+             * ABI: 64-byte header, then 64-byte records containing key, offsets,
+             * generated counts and emitted counts (four dwords each). */
+            nir_def *capacity = nir_load_global(b, 1, 32,
+               nir_iadd_imm(b, xfb_state_address, 52), .align_mul = 4);
+            /* Zero capacity retains the TES+GS path. TES-only records use the
+             * hardware workgroup ordinal; the host rejects wrapped sequences. */
+            nir_push_if(b, nir_ine_imm(b, capacity, 0));
+            nir_def *record_index = nir_global_atomic_amd(b, 32, xfb_state_address,
+               nir_imm_int(b, 1), nir_imm_int(b, 48), .atomic_op = nir_atomic_op_iadd);
+            nir_push_if(b, nir_ult(b, record_index, capacity));
+            {
+               nir_def *address = nir_iadd(b, xfb_state_address,
+                  nir_u2u64(b, nir_iadd_imm(b, nir_imul_imm(b, record_index, 64), 64)));
+               nir_store_global(b,
+                  nir_vec4(b, b->shader->info.stage == MESA_SHADER_TESS_EVAL ?
+                              nir_load_ordered_id_amd(b) : nir_load_primitive_id(b),
+                           /* TES: the first vertex's patch orders subgroups
+                            * across shader engines; the ordinal orders the
+                            * subgroups that split one patch. */
+                           b->shader->info.stage == MESA_SHADER_TESS_EVAL ?
+                              nir_load_primitive_id(b) : nir_load_invocation_id(b),
+                           /* GS after TES: the ordinal breaks ties between
+                            * subgroups that share one input patch. */
+                           b->shader->info.stage == MESA_SHADER_GEOMETRY ?
+                              nir_load_ordered_id_amd(b) : nir_imm_int(b, 0),
+                           nir_imm_int(b, 0)), address,
+                           .align_mul = 4, .write_mask = 15);
+               nir_store_global(b, buffer_offsets, nir_iadd_imm(b, address, 16),
+                                .align_mul = 4, .write_mask = info->buffers_written);
+               nir_def *generated[4], *emitted[4];
+               for (unsigned stream = 0; stream < 4; ++stream) {
+                  generated[stream] = gen_prim[stream] ? gen_prim[stream] : nir_imm_int(b, 0);
+                  emitted[stream] = emit_prim[stream] ? emit_prim[stream] : nir_imm_int(b, 0);
+               }
+               nir_store_global(b, nir_vec(b, generated, 4), nir_iadd_imm(b, address, 32),
+                                .align_mul = 4, .write_mask = 15);
+               nir_store_global(b, nir_vec(b, emitted, 4), nir_iadd_imm(b, address, 48),
+                                .align_mul = 4, .write_mask = 15);
+            }
+            nir_push_else(b, NULL);
+            nir_global_atomic_amd(b, 32, xfb_state_address, nir_imm_int(b, 1),
+                                 nir_imm_int(b, 56), .atomic_op = nir_atomic_op_ior);
+            nir_pop_if(b, NULL);
+            nir_pop_if(b, NULL);
+         }
+         nir_scoped_memory_barrier(b, SCOPE_DEVICE, NIR_MEMORY_ACQ_REL,
+                                   nir_var_mem_global);
       }
    }
    nir_pop_if(b, if_invocation_0);

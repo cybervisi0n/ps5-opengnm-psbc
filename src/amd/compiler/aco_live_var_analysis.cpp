@@ -689,6 +689,12 @@ update_vgpr_sgpr_demand(Program* program, RegisterDemand new_demand)
 
       /* Adjust for LDS, workgroup multiples and callee ABI, and calculate max_reg_demand */
       program->num_waves = max_suitable_waves(program, program->num_waves);
+      if (!program->num_waves) {
+         /* Fixed registers can lower occupancy below the workgroup minimum after
+          * the initial pressure check. Let the normal spiller reduce demand. */
+         program->max_reg_demand = temp_demand;
+         return;
+      }
       if (program->is_callee) {
          /* Decrease waves to reduce the chances of needing preserved VGPRs. */
          std::pair<int, unsigned> best(INT_MIN, program->num_waves);

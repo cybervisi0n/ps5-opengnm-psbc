@@ -456,6 +456,7 @@ radv_postprocess_nir(const struct radv_compiler_info *compiler_info, const struc
 
       if (!late_options.no_color_export) {
          late_options.dual_src_blend = gfx_state->ps.epilog.mrt0_is_dual_src;
+         late_options.force_dual_src_blend_swizzle = gfx_state->ps.force_dual_src_blend_swizzle;
          late_options.color_is_int8 = gfx_state->ps.epilog.color_is_int8;
          late_options.color_is_int10 = gfx_state->ps.epilog.color_is_int10;
          late_options.enable_mrt_output_nan_fixup =
@@ -515,6 +516,9 @@ radv_postprocess_nir(const struct radv_compiler_info *compiler_info, const struc
          .workgroup_size = stage->info.workgroup_size,
          .use_llvm = use_llvm,
          .load_grid_size_from_user_sgpr = compiler_info->key.load_grid_size_from_user_sgpr,
+         .tess_offchip_se_stride = compiler_info->key.ps5_offchip_se_bias
+                                      ? 256u * compiler_info->ac->hs_offchip_workgroup_dw_size * 4u
+                                      : 0,
       });
    NIR_PASS(_, stage->nir, radv_nir_lower_abi, gfx_level, stage, gfx_state, compiler_info->hw.address32_hi);
 

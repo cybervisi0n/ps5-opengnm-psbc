@@ -101,7 +101,8 @@ struct radv_shader_stage_key {
    /* Whether the shader is used with indirect pipeline binds. */
    uint8_t indirect_bindable : 1;
 
-   uint32_t reserved : 14;
+   uint32_t ps5_compact_vertex_inputs : 1;
+   uint32_t reserved : 13;
 };
 
 struct radv_ps_epilog_key {
@@ -186,6 +187,7 @@ struct radv_graphics_state_key {
    struct {
       struct radv_ps_epilog_key epilog;
       bool force_vrs_enabled;
+      bool force_dual_src_blend_swizzle;
       bool exports_mrtz_via_epilog;
       bool has_epilog;
    } ps;
@@ -564,7 +566,11 @@ struct radv_compiler_info {
       uint32_t lower_terminate_to_discard : 1;
       uint32_t no_implicit_varying_subgroup_size : 1;
       uint32_t nir_debug_info : 1;
-      uint32_t padding : 28;
+      uint32_t ps5_global_streamout : 1;
+      uint32_t ps5_global_primitive_query : 1;
+      uint32_t ps5_buffer_scratch : 1;
+      uint32_t ps5_offchip_se_bias : 1;
+      uint32_t padding : 24;
 
       int32_t force_aniso;
 

@@ -1,6 +1,6 @@
 #version 450
 
-layout(points) in;
+layout(triangles) in;
 layout(triangle_strip) out;
 layout(max_vertices = 3) out;
 

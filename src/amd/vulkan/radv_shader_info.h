@@ -131,6 +131,7 @@ struct radv_shader_info {
       bool as_ls : 1;
       bool tcs_in_out_eq : 1;
       bool needs_base_instance : 1;
+      bool needs_instance_id_bias : 1;
       bool use_per_attribute_vb_descs : 1;
       bool has_prolog : 1;
       bool dynamic_inputs : 1;

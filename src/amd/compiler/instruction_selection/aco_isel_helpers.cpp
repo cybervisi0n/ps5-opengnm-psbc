@@ -20,6 +20,16 @@ void
 _isel_err(isel_context* ctx, const char* file, unsigned line, const nir_instr* instr,
           const char* msg)
 {
+#if defined(__ORBIS__) || defined(OPENGNM_PSBC_ORBIS)
+   /* open_memstream() is not usable in the native console libc.  Keep the
+    * diagnostic path allocation-free so an unsupported NIR instruction is
+    * reported instead of crashing inside stdio. */
+   (void)ctx;
+   fprintf(stderr, "ACO ERROR: %s:%u: %s: ", file, line, msg);
+   nir_print_instr(instr, stderr);
+   fputc('\n', stderr);
+   fflush(stderr);
+#else
    char* out;
    size_t outsize;
    struct u_memstream mem;
@@ -32,6 +42,7 @@ _isel_err(isel_context* ctx, const char* file, unsigned line, const nir_instr* i
 
    _aco_err(ctx->program, file, line, out);
    free(out);
+#endif
 }
 
 void
@@ -773,7 +784,7 @@ add_startpgm(struct isel_context* ctx, bool is_callee)
 
    /* epilog has no scratch */
    if (ctx->args->scratch_offset.used) {
-      if (ctx->program->gfx_level < GFX9) {
+      if (ctx->program->gfx_level < GFX9 || ctx->program->buffer_scratch) {
          /* Stash these in the program so that they can be accessed later when
           * handling spilling.
           */

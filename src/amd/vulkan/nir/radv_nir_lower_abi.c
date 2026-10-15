@@ -354,7 +354,7 @@ lower_abi_instr(nir_builder *b, nir_intrinsic_instr *intrin, void *state)
          }
       }
 
-      if (s->gfx_level >= GFX11) {
+      if (s->gfx_level >= GFX11 || s->args->ngg_query_buf_va.used) {
          nir_def *va = nir_pack_64_2x32_split(b, ac_nir_load_arg(b, &s->args->ac, s->args->ngg_query_buf_va),
                                               nir_imm_int(b, s->address32_hi));
 

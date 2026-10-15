@@ -80,6 +80,7 @@ struct radv_shader_args {
 
    /* Streamout */
    struct ac_arg streamout_buffers;
+   struct ac_arg instance_id_bias;
    struct ac_arg streamout_state; /* GFX12+ */
 
    /* Task */

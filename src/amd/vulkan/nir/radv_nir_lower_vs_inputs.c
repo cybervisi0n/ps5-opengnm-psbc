@@ -17,6 +17,7 @@ typedef struct {
    const struct radv_shader_info *info;
    const struct radv_graphics_state_key *gfx_state;
    const struct radv_compiler_info *compiler_info;
+   bool compact_vertex_inputs;
 } lower_vs_inputs_state;
 
 static nir_def *
@@ -217,6 +218,13 @@ location_from_intrinsic(nir_intrinsic_instr *intrin, const lower_vs_inputs_state
    const nir_io_semantics io_sem = nir_intrinsic_io_semantics(intrin);
    const unsigned base_offset = nir_src_as_uint(*offset_src);
    const unsigned loc = io_sem.location + base_offset - VERT_ATTRIB_GENERIC0;
+
+   /* Gallium keeps both halves at the same attribute location. Neighboring
+    * doubles are distinct attributes; only high_dvec2 selects the upper half. */
+   if (s->compact_vertex_inputs) {
+      *is_high_dvec2 = io_sem.high_dvec2;
+      return loc;
+   }
 
    /* Check whether the current slot is the high part of a 64-bit input.
     * If so, use the low part of the 64-bit input as location.
@@ -462,6 +470,7 @@ radv_nir_lower_vs_inputs(nir_shader *shader, const struct radv_compiler_info *co
       .args = &vs_stage->args,
       .gfx_state = gfx_state,
       .compiler_info = compiler_info,
+      .compact_vertex_inputs = vs_stage->key.ps5_compact_vertex_inputs,
    };
 
    return nir_shader_intrinsics_pass(shader, lower_vs_input_instr, nir_metadata_control_flow, &state);

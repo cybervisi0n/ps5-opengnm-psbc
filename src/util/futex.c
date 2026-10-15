@@ -56,7 +56,7 @@ int futex_wait(uint32_t *addr, int32_t value, const struct timespec *timeout)
                     FUTEX_BITSET_MATCH_ANY);
 }
 
-#elif defined(__ORBIS__)
+#elif defined(__ORBIS__) && !defined(__PROSPERO__)
 
 #include <errno.h>
 #include <pthread.h>

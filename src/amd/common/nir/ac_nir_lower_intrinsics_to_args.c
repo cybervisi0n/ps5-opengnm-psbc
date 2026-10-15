@@ -285,6 +285,10 @@ lower_intrinsic_to_arg(nir_builder *b, nir_intrinsic_instr *intrin, void *state)
       break;
    case nir_intrinsic_load_ring_tess_offchip_offset_amd:
       replacement = ac_nir_load_arg(b, s->args, s->args->tess_offchip_offset);
+      if (s->options->tess_offchip_se_stride)
+         replacement = nir_iadd(b, replacement,
+                                nir_imul_imm(b, nir_load_sm_id_nv(b),
+                                             s->options->tess_offchip_se_stride));
       break;
    case nir_intrinsic_load_ring_tess_factors_offset_amd:
       replacement = ac_nir_load_arg(b, s->args, s->args->tcs_factor_offset);
@@ -314,6 +318,11 @@ lower_intrinsic_to_arg(nir_builder *b, nir_intrinsic_instr *intrin, void *state)
    }
    case nir_intrinsic_load_first_vertex:
       replacement = ac_nir_load_arg(b, s->args, s->args->base_vertex);
+      break;
+   case nir_intrinsic_load_base_vertex:
+      replacement = nir_iand(b,
+                             ac_nir_load_arg(b, s->args, s->args->is_indexed_draw),
+                             ac_nir_load_arg(b, s->args, s->args->base_vertex));
       break;
    case nir_intrinsic_load_base_instance:
       replacement = ac_nir_load_arg(b, s->args, s->args->start_instance);

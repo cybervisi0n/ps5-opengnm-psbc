@@ -171,6 +171,7 @@ init_program(Program* program, Stage stage, const struct aco_shader_info* info,
    }
 
    program->wgp_mode = options->wgp_mode;
+   program->buffer_scratch = options->buffer_scratch;
 
    program->progress = CompilationProgress::after_isel;
 

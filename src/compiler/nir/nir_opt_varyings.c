@@ -2687,15 +2687,16 @@ clone_ssa_impl(struct linkage_info *linkage, nir_builder *b, nir_def *ssa)
                 NIR_MAX_VEC_COMPONENTS);
       }
 
-      clone = nir_builder_alu_instr_finish_and_insert(b, alu_clone);
-
-      alu_clone->def.num_components = alu->def.num_components;
-      alu_clone->def.bit_size = alu->def.bit_size;
-
-      /* nir_builder_alu_instr_finish_and_insert overwrites fp_math_ctrl. */
+      /* Preserve explicit swizzles: the generic ALU builder clamps lanes
+       * beyond the source width, corrupting e.g. a vec3's .xxxx to .xxxz.
+       */
+      nir_def_init(&alu_clone->instr, &alu_clone->def,
+                   alu->def.num_components, alu->def.bit_size);
       alu_clone->fp_math_ctrl = alu->fp_math_ctrl;
       alu_clone->no_signed_wrap = alu->no_signed_wrap;
       alu_clone->no_unsigned_wrap = alu->no_unsigned_wrap;
+      nir_builder_instr_insert(b, &alu_clone->instr);
+      clone = &alu_clone->def;
       break;
    }
 

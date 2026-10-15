@@ -212,6 +212,9 @@ declare_vs_specific_input_sgprs(struct radv_shader_args_state *state, const stru
       if (info->vs.needs_base_instance) {
          RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.start_instance, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
       }
+      if (info->vs.needs_instance_id_bias)
+         RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, instance_id_bias, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
+      RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.is_indexed_draw, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
    }
 }
 
@@ -437,6 +440,7 @@ declare_unmerged_vs_tcs_args(struct radv_shader_args_state *state, const enum am
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.base_vertex, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.draw_id, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.start_instance, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
+   RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.is_indexed_draw, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
 
    declare_global_input_sgprs(state, gfx_level, info, user_sgpr_info);
 
@@ -486,6 +490,7 @@ declare_unmerged_vs_tes_gs_args(struct radv_shader_args_state *state, const enum
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.base_vertex, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.draw_id, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.start_instance, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
+   RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ac.is_indexed_draw, AC_UD_VS_BASE_VERTEX_START_INSTANCE);
 
    declare_global_input_sgprs(state, gfx_level, info, user_sgpr_info);
 
@@ -833,7 +838,7 @@ declare_shader_args(const struct radv_compiler_info *compiler_info, struct radv_
 
                declare_ngg_sgprs(state, info, ngg_needs_state_sgpr);
 
-               if (gfx_level >= GFX11 && has_shader_query)
+               if ((gfx_level >= GFX11 || compiler_info->key.ps5_global_primitive_query) && has_shader_query)
                   RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ngg_query_buf_va, AC_UD_NGG_QUERY_BUF_VA);
             }
 

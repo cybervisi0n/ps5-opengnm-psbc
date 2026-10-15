@@ -252,7 +252,20 @@ thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
     if (!pack) return thrd_nomem;
     pack->func = func;
     pack->arg = arg;
-    if (pthread_create(thr, NULL, impl_thrd_routine, pack) != 0) {
+#ifdef OPENGNM_PSBC_ORBIS
+    /* Native default stacks cannot hold NIR linker scratch arrays. */
+    pthread_attr_t attr;
+    int result = pthread_attr_init(&attr);
+    if (result == 0) {
+        result = pthread_attr_setstacksize(&attr, 8u * 1024u * 1024u);
+        if (result == 0)
+            result = pthread_create(thr, &attr, impl_thrd_routine, pack);
+        pthread_attr_destroy(&attr);
+    }
+#else
+    int result = pthread_create(thr, NULL, impl_thrd_routine, pack);
+#endif
+    if (result != 0) {
         free(pack);
         return thrd_error;
     }

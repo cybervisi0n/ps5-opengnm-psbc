@@ -75,6 +75,7 @@ struct ac_shader_args {
 
    /* VS */
    struct ac_arg base_vertex;
+   struct ac_arg is_indexed_draw;
    struct ac_arg start_instance;
    struct ac_arg draw_id;
    struct ac_arg vertex_buffers;

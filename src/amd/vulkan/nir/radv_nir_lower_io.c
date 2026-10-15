@@ -58,7 +58,37 @@ enum {
    RADV_IO_SLOT_CLIP_DIST1,
    RADV_IO_SLOT_PSIZ,
    RADV_IO_SLOT_VAR0, /* 0..31 */
+   /* OpenGL compatibility varyings use driver slots beyond generic VAR0..31. */
+   RADV_IO_SLOT_LEGACY0 = RADV_IO_SLOT_VAR0 + 32,
 };
+
+static bool
+radv_map_io_legacy_varying(unsigned semantic, unsigned *driver_location)
+{
+   switch (semantic) {
+   case VARYING_SLOT_COL0:
+      *driver_location = RADV_IO_SLOT_LEGACY0 + 0;
+      return true;
+   case VARYING_SLOT_COL1:
+      *driver_location = RADV_IO_SLOT_LEGACY0 + 1;
+      return true;
+   case VARYING_SLOT_BFC0:
+      *driver_location = RADV_IO_SLOT_LEGACY0 + 2;
+      return true;
+   case VARYING_SLOT_BFC1:
+      *driver_location = RADV_IO_SLOT_LEGACY0 + 3;
+      return true;
+   case VARYING_SLOT_FOGC:
+      *driver_location = RADV_IO_SLOT_LEGACY0 + 4;
+      return true;
+   default:
+      if (semantic >= VARYING_SLOT_TEX0 && semantic <= VARYING_SLOT_TEX7) {
+         *driver_location = RADV_IO_SLOT_LEGACY0 + 5 + (semantic - VARYING_SLOT_TEX0);
+         return true;
+      }
+      return false;
+   }
+}
 
 unsigned
 radv_map_io_driver_location(unsigned semantic)
@@ -66,6 +96,10 @@ radv_map_io_driver_location(unsigned semantic)
    if ((semantic >= VARYING_SLOT_PATCH0 && semantic < VARYING_SLOT_TESS_MAX) ||
        semantic == VARYING_SLOT_TESS_LEVEL_INNER || semantic == VARYING_SLOT_TESS_LEVEL_OUTER)
       return ac_shader_io_get_unique_index_patch(semantic);
+
+   unsigned legacy_driver_location;
+   if (radv_map_io_legacy_varying(semantic, &legacy_driver_location))
+      return legacy_driver_location;
 
    switch (semantic) {
    case VARYING_SLOT_POS:

@@ -97,6 +97,9 @@ typedef struct {
    unsigned workgroup_size;
    bool use_llvm;
    bool load_grid_size_from_user_sgpr;
+   /* PS5: both shader engines draw HS offchip slots from one 8-bit space;
+    * bias each SE's offchip offset by this many bytes. */
+   uint32_t tess_offchip_se_stride;
 } ac_nir_lower_intrinsics_to_args_options;
 
 bool ac_nir_lower_intrinsics_to_args(nir_shader *shader, const struct ac_shader_args *ac_args,
@@ -216,8 +219,10 @@ typedef struct {
    bool write_pos_to_clipvertex;
    bool can_cull; /* if true, cull distances are not exported because the shader culls against them */
    bool disable_streamout;
+   bool use_primitive_id_streamout;
    bool has_xfb_prim_query;
    bool use_gfx12_xfb_intrinsic;
+   bool use_ps5_global_streamout;
    bool has_gs_primitives_query;
    bool force_vrs;
    bool compact_primitives;
@@ -235,6 +240,7 @@ typedef struct {
    bool use_edgeflags;
    bool export_primitive_id;
    bool export_primitive_id_per_prim;
+   bool provoking_vtx_last;
    uint32_t instance_rate_inputs;
 
    /* MS */
@@ -405,6 +411,7 @@ typedef struct {
    bool dcc_decompress_gfx11;
    bool alpha_to_coverage_via_mrtz;
    bool dual_src_blend;
+   bool force_dual_src_blend_swizzle;
    unsigned spi_shader_col_format;
    unsigned color_is_int8;
    unsigned color_is_int10;
