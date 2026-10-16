@@ -105,8 +105,8 @@ src/compiler/spirv/spirv_info.c src/compiler/spirv/spirv_info.h: src/compiler/sp
 	$(PYTHON) $< --out-c src/compiler/spirv/spirv_info.c --out-h src/compiler/spirv/spirv_info.h --json src/compiler/spirv/spirv.core.grammar.json
 
 # VTN generator IDs (separate script, uses spir-v.xml not the JSON grammar)
-src/compiler/spirv/vtn_generator_ids.h: src/compiler/spirv/vtn_generator_ids_h.py ../SPIRV-Headers/include/spirv/spir-v.xml
-	$(PYTHON) $< ../SPIRV-Headers/include/spirv/spir-v.xml $@
+src/compiler/spirv/vtn_generator_ids.h: src/compiler/spirv/vtn_generator_ids_h.py SPIRV-Headers/include/spirv/spir-v.xml
+	$(PYTHON) $< SPIRV-Headers/include/spirv/spir-v.xml $@
 
 # VTN gather types
 src/compiler/spirv/vtn_gather_types.c: src/compiler/spirv/vtn_gather_types_c.py src/compiler/spirv/spirv.core.grammar.json

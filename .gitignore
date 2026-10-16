@@ -65,3 +65,5 @@ tests/*.metadata.json
 *~
 .vscode/
 .idea/
+
+ps5-payload-sdk/
