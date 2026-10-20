@@ -29,3 +29,9 @@ jobs:
 
       - name: Build
         run: ./drun.sh ./scripts/ci_build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ps5-opengnm-psbc_release
+          path: ps5-opengnm-psbc_release
